@@ -18,7 +18,7 @@ namespace SalsaNOW
         static async Task Main(string[] args)
         {
             // ❤️❤️❤️❤️ SalsaNOW Boosteroid V1.0.0 - by Zortos based on Dpadguy's SalsaNOW ❤️❤️❤️❤️
-            Console.Title = "Steam"; // Hidden due to Detection
+            Console.Title = ""; // Hidden due to Detection
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -43,12 +43,13 @@ namespace SalsaNOW
             //_ = BackgroundTasks.StartBrickPreventionAsync(cts.Token);
             _ = BackgroundTasks.CloseHandlesLaunchersHelper(cts.Token);
             _ = BackgroundTasks.CleanlogsLauncherHelper(cts.Token);
-             
+            _ = BackgroundTasks.ResetPoliciesAndExplorerAsync(cts.Token);
+
 
             // Execute deployment modules
             await AppInstaller.AppsInstallAsync(globalDirectory, customAppsJsonPath);
             await AppInstaller.DesktopInstallAsync(globalDirectory);
-            await AppInstaller.AppsInstallSilentAsync(globalDirectory);
+            //await AppInstaller.AppsInstallSilentAsync(globalDirectory);
             
             //await SteamManager.ShutdownServerAsync(globalDirectory);
             
@@ -57,7 +58,7 @@ namespace SalsaNOW
 
             NativeMethods.ShowWindow(NativeMethods.GetConsoleWindow(), NativeMethods.SW_HIDE);
             
-            _ = SteamManager.SetupGameSavesAsync(globalDirectory);
+            // _ = SteamManager.SetupGameSavesAsync(globalDirectory);
             
             string batch = Path.Combine(globalDirectory, "StartupBatch.bat");
             if (File.Exists(batch)) Process.Start(new ProcessStartInfo { FileName = batch, UseShellExecute = true });

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,80 +13,35 @@ namespace SalsaNOW
 {
     internal static class BackgroundTasks
     {
- 
+
 
         public static async Task CloseHandlesLaunchersHelper(CancellationToken token)
         {
             const string launcherPath = @"C:\Users\user\boosteroid-experience\LaunchersHelper.exe";
-            string processName = Path.GetFileNameWithoutExtension(launcherPath);
-            var processes = Process.GetProcessesByName(processName);
-
-            foreach (var process in processes)
+            await Task.Run(() =>
             {
-                IntPtr processHandle = IntPtr.Zero;
-
+                if (token.IsCancellationRequested)
+                    return;
                 try
                 {
-                    processHandle = NativeMethods.OpenProcess(NativeMethods.ProcessQueryLimitedInformation, false, process.Id);
-                    if (processHandle == IntPtr.Zero)
-                    {
-                        continue;
-                    }
-
-                    var pathBuilder = new StringBuilder(260);
-                    int pathLength = pathBuilder.Capacity;
-                    if (!NativeMethods.QueryFullProcessImageName(processHandle, 0, pathBuilder, ref pathLength))
-                    {
-                        continue;
-                    }
-
-                    string currentPath = pathBuilder.ToString();
-
-                    if (!string.Equals(currentPath, launcherPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    SalsaLogger.Info($"Closing LaunchersHelper process: {currentPath}");
-
-                    try
-                    {
-                        if (process.CloseMainWindow())
-                        {
-                            await Task.Run(() => process.WaitForExit(5000));
-                        }
-                    }
-                    catch { }
-
-                    if (process.HasExited)
-                    {
-                        SalsaLogger.Info("LaunchersHelper.exe closed successfully.");
-                    }
+                    int n = NativeMethods.CloseAllHandlesForProcessImagePath(launcherPath);
+                    if (n == 0)
+                        SalsaLogger.Warn("CloseHandlesLaunchersHelper: 0 handles closed (process not running, path mismatch, or run elevated).");
                     else
-                    {
-                        SalsaLogger.Warn("LaunchersHelper.exe did not exit after the close request.");
-                    }
+                        SalsaLogger.Info($"Closed {n} handle(s) in LaunchersHelper (all types, System Informer style).");
                 }
                 catch (Exception ex)
                 {
-                    SalsaLogger.Error($"Failed to close LaunchersHelper.exe: {ex.Message}");
+                    SalsaLogger.Error($"CloseHandlesLaunchersHelper: {ex.Message}");
                 }
-                finally
-                {
-                    if (processHandle != IntPtr.Zero)
-                    {
-                        NativeMethods.CloseHandle(processHandle);
-                    }
-
-                    process.Dispose();
-                }
-            }
+            }, token);
         }
 
+      
 
         public static Task CleanlogsLauncherHelper(CancellationToken token)
         {
-            const string logPath = @"C:\users\user\boosteroid-experience\logs\launchershelper.log";
+            const string logPath = @"C:\users\user\boosteroid-experience\logs\LaunchersHelperLog.txt";
 
             if (token.IsCancellationRequested)
             {
@@ -239,6 +196,83 @@ namespace SalsaNOW
             }
         }
 
-    
+
+        public static async Task ResetPoliciesAndExplorerAsync(CancellationToken token)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    string sys32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32");
+                    foreach (string name in new[] { "GroupPolicy", "GroupPolicyUsers" })
+                    {
+                        string dir = Path.Combine(sys32, name);
+                        try
+                        {
+                            if (Directory.Exists(dir))
+                                Directory.Delete(dir, true);
+                        }
+                        catch { }
+                    }
+                    SalsaLogger.Info("Removed Local Group Policy cache folders (System32\\GroupPolicy, GroupPolicyUsers).");
+
+                    string gpupdate = Path.Combine(sys32, "gpupdate.exe");
+                    if (File.Exists(gpupdate))
+                    {
+                        using (var gp = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = gpupdate,
+                            Arguments = "/force",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }))
+                        {
+                            gp?.WaitForExit(120000);
+                        }
+                        SalsaLogger.Info("Ran gpupdate /force.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SalsaLogger.Error($"Failed to reset local Group Policy cache or gpupdate: {ex.Message}");
+                }
+
+                if (token.IsCancellationRequested) return;
+
+                string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                string explorerPath = Path.Combine(winDir, "explorer.exe");
+                if (!File.Exists(explorerPath))
+                    explorerPath = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "explorer.exe");
+
+                try
+                {
+                    foreach (var process in Process.GetProcessesByName("explorer"))
+                    {
+                        try { process.Kill(); process.WaitForExit(5000); } catch { }
+                    }
+                    SalsaLogger.Info("Terminated explorer.exe.");
+                }
+                catch (Exception ex) { SalsaLogger.Error($"Failed to terminate explorer.exe: {ex.Message}"); }
+
+                // Let the shell release handles before starting a new Explorer instance.
+                Thread.Sleep(500);
+
+                if (token.IsCancellationRequested) return;
+
+                try
+                {
+                    // .NET Framework defaults UseShellExecute to false; Explorer must be started through the shell.
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = explorerPath,
+                        WorkingDirectory = winDir,
+                        UseShellExecute = true
+                    });
+                    SalsaLogger.Info("Restarted explorer.exe.");
+                }
+                catch (Exception ex) { SalsaLogger.Error($"Failed to restart explorer.exe: {ex.Message}"); }
+            }, token);
+        }
+
     }
 }
