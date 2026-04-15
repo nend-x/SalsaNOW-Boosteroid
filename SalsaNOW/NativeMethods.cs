@@ -5,7 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
     internal static class NativeMethods
     {

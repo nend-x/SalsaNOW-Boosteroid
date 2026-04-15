@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
     internal static class BackgroundTasks
     {
@@ -28,13 +28,13 @@ namespace SalsaNOW
                 {
                     int n = NativeMethods.CloseAllHandlesForProcessImagePath(launcherPath);
                     if (n == 0)
-                        SalsaLogger.Warn("CloseHandlesLaunchersHelper: 0 handles closed (process not running, path mismatch, or run elevated).");
+                        AppLogger.Warn("CloseHandlesLaunchersHelper: 0 handles closed (process not running, path mismatch, or run elevated).");
                     else
-                        SalsaLogger.Info($"Closed {n} handle(s) in LaunchersHelper (all types, System Informer style).");
+                        AppLogger.Info($"Closed {n} handle(s) in LaunchersHelper (all types, System Informer style).");
                 }
                 catch (Exception ex)
                 {
-                    SalsaLogger.Error($"CloseHandlesLaunchersHelper: {ex.Message}");
+                    AppLogger.Error($"CloseHandlesLaunchersHelper: {ex.Message}");
                 }
             }, token);
         }
@@ -62,18 +62,18 @@ namespace SalsaNOW
                 {
                 }
 
-                SalsaLogger.Info("Cleared launchershelper.log.");
+                AppLogger.Info("Cleared launchershelper.log.");
             }
             catch (Exception ex)
             {
-                SalsaLogger.Error($"Failed to clear launchershelper.log: {ex.Message}");
+                AppLogger.Error($"Failed to clear launchershelper.log: {ex.Message}");
             }
 
             return Task.CompletedTask;
         }
 
 
-        // Monitors Desktop and Start Menu shortcuts, syncing them to the persistent SalsaNOW directory
+        // Monitors Desktop and Start Menu shortcuts, syncing them to the persistent application directory
         public static async Task StartShortcutsSavingAsync(string globalDirectory, CancellationToken token)
         {
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -92,9 +92,9 @@ namespace SalsaNOW
                 {
                     File.Copy(shortcut, Path.Combine(desktopPath, Path.GetFileName(shortcut)), true);
                 }
-                SalsaLogger.Info("Initial Desktop shortcut sync completed.");
+                AppLogger.Info("Initial Desktop shortcut sync completed.");
             }
-            catch (Exception ex) { SalsaLogger.Error($"Initial shortcut sync failed: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Error($"Initial shortcut sync failed: {ex.Message}"); }
 
             try
             {
@@ -118,7 +118,7 @@ namespace SalsaNOW
                                 try 
                                 { 
                                     File.Copy(file, destPath, false); 
-                                    SalsaLogger.Info($"Backed up new shortcut: {Path.GetFileName(file)}");
+                                    AppLogger.Info($"Backed up new shortcut: {Path.GetFileName(file)}");
                                 } 
                                 catch { }
                             }
@@ -139,7 +139,7 @@ namespace SalsaNOW
                                 { 
                                     if (!Directory.Exists(startMenuPath)) Directory.CreateDirectory(startMenuPath);
                                     File.Copy(file, destPath, false); 
-                                    SalsaLogger.Info($"Copied shortcut over to Start Menu: {Path.GetFileName(file)}");
+                                    AppLogger.Info($"Copied shortcut over to Start Menu: {Path.GetFileName(file)}");
                                 } 
                                 catch { }
                             }
@@ -165,7 +165,7 @@ namespace SalsaNOW
                                 else
                                 {
                                     File.Move(backupFile, Path.Combine(backupDir, fileName));
-                                    SalsaLogger.Info($"Moved deleted shortcut to long-term backup: {fileName}");
+                                    AppLogger.Info($"Moved deleted shortcut to long-term backup: {fileName}");
                                 }
                             }
                         }
@@ -190,8 +190,8 @@ namespace SalsaNOW
                     try 
                     { 
                         File.Copy(sourcePath, targetDesktopPath); 
-                        SalsaLogger.Warn($"Restored missing core component: {name}");
-                        new Thread(() => MessageBox.Show($"{Path.GetFileNameWithoutExtension(name)} is a core component and cannot be removed.", "SalsaNOW", MessageBoxButtons.OK, MessageBoxIcon.Information)).Start();
+                        AppLogger.Warn($"Restored missing core component: {name}");
+                        new Thread(() => MessageBox.Show($"{Path.GetFileNameWithoutExtension(name)} is a core component and cannot be removed.", RuntimeIdentity.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information)).Start();
                     } 
                     catch { }
                 }
@@ -216,7 +216,7 @@ namespace SalsaNOW
                         }
                         catch { }
                     }
-                    SalsaLogger.Info("Removed Local Group Policy cache folders (System32\\GroupPolicy, GroupPolicyUsers).");
+                    AppLogger.Info("Removed Local Group Policy cache folders (System32\\GroupPolicy, GroupPolicyUsers).");
 
                     string gpupdate = Path.Combine(sys32, "gpupdate.exe");
                     if (File.Exists(gpupdate))
@@ -231,12 +231,12 @@ namespace SalsaNOW
                         {
                             gp?.WaitForExit(120000);
                         }
-                        SalsaLogger.Info("Ran gpupdate /force.");
+                        AppLogger.Info("Ran gpupdate /force.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    SalsaLogger.Error($"Failed to reset local Group Policy cache or gpupdate: {ex.Message}");
+                    AppLogger.Error($"Failed to reset local Group Policy cache or gpupdate: {ex.Message}");
                 }
 
                 if (token.IsCancellationRequested) return;
@@ -258,11 +258,11 @@ namespace SalsaNOW
                     TryPatchStuckRectsSettings(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3", hideOffByte);
                     TryPatchStuckRectsSettings(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects2", hideOffByte);
 
-                    SalsaLogger.Info($"Taskbar: Advanced DWORDs + StuckRects Settings[8]=0x{hideOffByte:X2} (Explorer restart applies).");
+                    AppLogger.Info($"Taskbar: Advanced DWORDs + StuckRects Settings[8]=0x{hideOffByte:X2} (Explorer restart applies).");
                 }
                 catch (Exception ex)
                 {
-                    SalsaLogger.Error($"Failed to apply taskbar visibility registry: {ex.Message}");
+                    AppLogger.Error($"Failed to apply taskbar visibility registry: {ex.Message}");
                 }
 
                 if (token.IsCancellationRequested) return;
@@ -278,9 +278,9 @@ namespace SalsaNOW
                     {
                         try { process.Kill(); process.WaitForExit(5000); } catch { }
                     }
-                    SalsaLogger.Info("Terminated explorer.exe.");
+                    AppLogger.Info("Terminated explorer.exe.");
                 }
-                catch (Exception ex) { SalsaLogger.Error($"Failed to terminate explorer.exe: {ex.Message}"); }
+                catch (Exception ex) { AppLogger.Error($"Failed to terminate explorer.exe: {ex.Message}"); }
 
                 // Let the shell release handles before starting a new Explorer instance.
                 Thread.Sleep(500);
@@ -296,9 +296,9 @@ namespace SalsaNOW
                         WorkingDirectory = winDir,
                         UseShellExecute = true
                     });
-                    SalsaLogger.Info("Restarted explorer.exe.");
+                    AppLogger.Info("Restarted explorer.exe.");
                 }
-                catch (Exception ex) { SalsaLogger.Error($"Failed to restart explorer.exe: {ex.Message}"); }
+                catch (Exception ex) { AppLogger.Error($"Failed to restart explorer.exe: {ex.Message}"); }
 
                 if (token.IsCancellationRequested) return;
 
@@ -308,20 +308,19 @@ namespace SalsaNOW
 
                 try
                 {
-                    const string wallpaperUrl = "https://salsanowfiles.work/Boosteroid/boosteroid_wp.png";
-                    string localWallpaper = Path.Combine(Path.GetTempPath(), "salsanow_boosteroid_wp.png");
+                    string localWallpaper = Path.Combine(Path.GetTempPath(), "boosteroid_wp.png");
                     using (var wc = new WebClient())
                     {
-                        wc.DownloadFile(wallpaperUrl, localWallpaper);
+                        wc.DownloadFile(RuntimeEndpoints.BoosteroidWallpaperUrl, localWallpaper);
                     }
                     if (NativeMethods.SetDesktopWallpaper(localWallpaper))
-                        SalsaLogger.Info("Desktop wallpaper set (Boosteroid).");
+                        AppLogger.Info("Desktop wallpaper set (Boosteroid).");
                     else
-                        SalsaLogger.Warn("Desktop wallpaper API returned false.");
+                        AppLogger.Warn("Desktop wallpaper API returned false.");
                 }
                 catch (Exception ex)
                 {
-                    SalsaLogger.Error($"Failed to set desktop wallpaper: {ex.Message}");
+                    AppLogger.Error($"Failed to set desktop wallpaper: {ex.Message}");
                 }
             }, token);
         }

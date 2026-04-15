@@ -11,20 +11,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
     internal static class AppInstaller
     {
         // Parallel installation of user-defined apps from remote and local JSON sources
         public static async Task AppsInstallAsync(string globalDirectory, string customAppsJsonPath)
         {
-            const string jsonUrl = "https://salsanowfiles.work/jsons/apps.json";
             try
             {
                 List<Apps> apps;
                 using (var wc = new WebClient())
                 {
-                    string json = await wc.DownloadStringTaskAsync(jsonUrl);
+                    string json = await wc.DownloadStringTaskAsync(RuntimeEndpoints.AppsJsonUrl);
                     apps = JsonConvert.DeserializeObject<List<Apps>>(json);
                 }
 
@@ -36,7 +35,7 @@ namespace SalsaNOW
                         var customApps = JsonConvert.DeserializeObject<List<Apps>>(System.IO.File.ReadAllText(customAppsJsonPath));
                         if (customApps != null) apps.AddRange(customApps);
                     }
-                    catch (Exception ex) { SalsaLogger.Error($"Custom JSON Error: {ex.Message}"); }
+                    catch (Exception ex) { AppLogger.Error($"Custom JSON Error: {ex.Message}"); }
                 }
 
                 var tasks = apps.Select(app => Task.Run(async () =>
@@ -56,7 +55,7 @@ namespace SalsaNOW
                         // Initial installation for missing applications
                         if (!alreadyExists)
                         {
-                            SalsaLogger.Info("Installing " + app.name);
+                            AppLogger.Info("Installing " + app.name);
                             if (isZip)
                             {
                                 string zipPath = $"{appDir}.zip";
@@ -76,7 +75,7 @@ namespace SalsaNOW
                         }
                         else
                         {
-                            SalsaLogger.Info($"{app.name} already exists. Skipping download and respecting user desktop layout.");
+                            AppLogger.Info($"{app.name} already exists. Skipping download and respecting user desktop layout.");
                             
                           
                             if (isZip)
@@ -93,13 +92,12 @@ namespace SalsaNOW
 
                 await Task.WhenAll(tasks);
             }
-            catch (Exception ex) { SalsaLogger.Error(ex.Message); }
+            catch (Exception ex) { AppLogger.Error(ex.Message); }
         }
 
         // Silent background app deployment with automated cleanup of obsolete files/folders
         public static async Task AppsInstallSilentAsync(string globalDirectory)
         {
-            const string jsonUrl = "https://salsanowfiles.work/jsons/silentapps.json";
             string silentAppsPath = Path.Combine(globalDirectory, "SilentApps");
 
             try
@@ -108,7 +106,7 @@ namespace SalsaNOW
                 List<SilentApps> apps;
                 using (var wc = new WebClient())
                 {
-                    string json = await wc.DownloadStringTaskAsync(jsonUrl);
+                    string json = await wc.DownloadStringTaskAsync(RuntimeEndpoints.SilentAppsJsonUrl);
                     apps = JsonConvert.DeserializeObject<List<SilentApps>>(json);
                 }
 
@@ -155,14 +153,12 @@ namespace SalsaNOW
 
                 await Task.WhenAll(tasks);
             }
-            catch (Exception ex) { SalsaLogger.Error(ex.ToString()); }
+            catch (Exception ex) { AppLogger.Error(ex.ToString()); }
         }
 
         // Setup for Desktop shells and visual personalization
         public static async Task DesktopInstallAsync(string globalDirectory)
         {
-            const string jsonUrl = "https://salsanowfiles.work/jsons/desktop.json";
-            
             // Enforce Dark Mode for Windows Apps
             Process.Start(new ProcessStartInfo("cmd.exe", "/c reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\" /v AppsUseLightTheme /t REG_DWORD /d 0 /f") { UseShellExecute = true });
 
@@ -171,12 +167,12 @@ namespace SalsaNOW
                 List<DesktopInfo> desktopInfo;
                 using (var wc = new WebClient())
                 {
-                    string json = await wc.DownloadStringTaskAsync(jsonUrl);
+                    string json = await wc.DownloadStringTaskAsync(RuntimeEndpoints.DesktopJsonUrl);
                     desktopInfo = JsonConvert.DeserializeObject<List<DesktopInfo>>(json);
                 }
 
-                bool skipSeelen = SalsaSettings.SkipSeelenUiExecution;
-                bool bingWall = SalsaSettings.BingWallpaperEnabled;
+                bool skipSeelen = AppSettings.SkipSeelenUiExecution;
+                bool bingWall = AppSettings.BingWallpaperEnabled;
 
                 // Terminate original explorer shells to prepare for custom shell injection
                 IntPtr hWndSeelen = NativeMethods.FindWindow(null, "CustomExplorer");
@@ -236,7 +232,7 @@ namespace SalsaNOW
 
                 if (skipSeelen) await SeelenSettingsLoop();
             }
-            catch (Exception ex) { SalsaLogger.Error(ex.ToString()); }
+            catch (Exception ex) { AppLogger.Error(ex.ToString()); }
         }
 
         // Extracts fresh Seelen UI config, cleaning the target directory beforehand to prevent corruption
@@ -358,7 +354,7 @@ namespace SalsaNOW
                 lnk.WorkingDirectory = workDir;
                 lnk.Save();
             }
-            catch (Exception ex) { SalsaLogger.Error($"Shortcut creation failed for {name}: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Error($"Shortcut creation failed for {name}: {ex.Message}"); }
         }
     }
 }

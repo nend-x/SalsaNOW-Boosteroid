@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {   // Nvidia NVAPI Implementation
     // Credit: https://github.com/mercuryy-1337/
     internal static class NvidiaManager
@@ -56,12 +56,12 @@ namespace SalsaNOW
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int Del_NvAPI_DRS_SetSetting(IntPtr hSession, IntPtr hProfile, IntPtr pSetting);
 
-        private static T GetDelegate<T>(uint id) where T : Delegate
+        private static T GetDelegate<T>(uint id) where T : class
         {
             IntPtr ptr = NvAPI_QueryInterface(id);
             if (ptr == IntPtr.Zero)
                 throw new EntryPointNotFoundException($"NVAPI function 0x{id:X8} could not be resolved. Ensure an NVIDIA GPU driver is installed.");
-            return Marshal.GetDelegateForFunctionPointer<T>(ptr);
+            return Marshal.GetDelegateForFunctionPointer(ptr, typeof(T)) as T;
         }
         
         // we build a clean NVDRS_SETTING block here because SetSetting expects the native layout.

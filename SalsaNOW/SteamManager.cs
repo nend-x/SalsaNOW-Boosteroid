@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
     internal static class SteamManager
     {
@@ -20,14 +20,14 @@ namespace SalsaNOW
         {
             try
             {
-                SalsaLogger.Info("Initiating Steam Proxy shutdown sequence...");
+                AppLogger.Info("Initiating Steam Proxy shutdown sequence...");
                 string dummyJson = Path.Combine(globalDirectory, "kaka.json");
                 string usgMask = Path.Combine(globalDirectory, "conhost.exe");
 
                 using (var wc = new WebClient())
                 {
                     try { await wc.UploadStringTaskAsync("http://127.10.0.231:9753/shutdown", "POST"); } catch { }
-                    await wc.DownloadFileTaskAsync(new Uri("https://salsanowfiles.work/jsons/kaka.json"), dummyJson);
+                    await wc.DownloadFileTaskAsync(new Uri(RuntimeEndpoints.SteamProxyJsonUrl), dummyJson);
                 }
 
                 // Force lockdown server to use our fake JSON definition
@@ -44,15 +44,15 @@ namespace SalsaNOW
                 if (Directory.Exists(cache)) Directory.Delete(cache, true);
 
                 // Steam USG Bypass Part (Temporary until patch discovered)
-                using (var wc = new WebClient()) await wc.DownloadFileTaskAsync(new Uri("https://salsanowfiles.work/USG/bleh.exe"), usgMask);
+                using (var wc = new WebClient()) await wc.DownloadFileTaskAsync(new Uri(RuntimeEndpoints.UsgExeUrl), usgMask);
                 var usg = Process.Start(usgMask);
                 if (usg != null) { while (!usg.HasExited) await Task.Delay(1000); }
                 await Task.Delay(200);
                 if (File.Exists(usgMask)) File.Delete(usgMask);
                 
-                SalsaLogger.Info("Steam Proxy successfully bypassed.");
+                AppLogger.Info("Steam Proxy successfully bypassed.");
             }
-            catch (Exception ex) { SalsaLogger.Error($"Steam Proxy Shutdown Error: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Error($"Steam Proxy Shutdown Error: {ex.Message}"); }
         }
 
         // Sets up directory junctions for cloud saves redirection
@@ -60,9 +60,9 @@ namespace SalsaNOW
         {
             try
             {
-                SalsaLogger.Info("Setting up Cloud Save directory junctions...");
+                AppLogger.Info("Setting up Cloud Save directory junctions...");
                 string json;
-                using (var wc = new WebClient()) json = await wc.DownloadStringTaskAsync("https://salsanowfiles.work/jsons/GameSavesPaths.json");
+                using (var wc = new WebClient()) json = await wc.DownloadStringTaskAsync(RuntimeEndpoints.GameSavesJsonUrl);
                 var savePaths = JsonConvert.DeserializeObject<GamesSavePaths>(json);
                 string savesRoot = Path.Combine(globalDirectory, "Game Saves");
                 Directory.CreateDirectory(savesRoot);
@@ -77,9 +77,9 @@ namespace SalsaNOW
 
                     if (dir.Contains(@"C:\Users\Public\Documents")) await HandlePublicDocs(dir, crafted);
                 }
-                SalsaLogger.Info("Cloud Save junctions successfully created.");
+                AppLogger.Info("Cloud Save junctions successfully created.");
             }
-            catch (Exception ex) { SalsaLogger.Error($"Game Saves Setup Error: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Error($"Game Saves Setup Error: {ex.Message}"); }
         }
 
         private static async Task HandlePublicDocs(string dir, string crafted)

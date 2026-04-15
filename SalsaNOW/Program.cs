@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Newtonsoft.Json;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
     internal class Program
     {
@@ -15,10 +15,14 @@ namespace SalsaNOW
         private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static string customAppsJsonPath = null;
 
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
-            // ❤️❤️❤️❤️ SalsaNOW Boosteroid V1.0.0 - by Zortos based on Dpadguy's SalsaNOW ❤️❤️❤️❤️
-            Console.Title = ""; // Hidden due to Detection
+            MainAsync(args).GetAwaiter().GetResult();
+        }
+
+        static async Task MainAsync(string[] args)
+        {
+            Console.Title = RuntimeIdentity.AppName;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -34,7 +38,7 @@ namespace SalsaNOW
             await Startup();
             
             // Load configuration once to share settings across modules
-            SalsaSettings.Load(globalDirectory);
+            AppSettings.Load(globalDirectory);
 
             // Fire and forget non-blocking background services
             //_ = BackgroundTasks.StartShortcutsSavingAsync(globalDirectory, cts.Token);
@@ -54,7 +58,7 @@ namespace SalsaNOW
             //await SteamManager.ShutdownServerAsync(globalDirectory);
             
             // Apply Nvidia optimizations if enabled
-            //if (SalsaSettings.NvidiaRaytracing) NvidiaManager.EnableRTX();
+            //if (AppSettings.NvidiaRaytracing) NvidiaManager.EnableRTX();
 
             NativeMethods.ShowWindow(NativeMethods.GetConsoleWindow(), NativeMethods.SW_HIDE);
             
@@ -78,22 +82,22 @@ namespace SalsaNOW
                 
                 using (var wc = new WebClient())
                 {
-                    var dir = JsonConvert.DeserializeObject<System.Collections.Generic.List<SavePath>>(await wc.DownloadStringTaskAsync("https://files.zortos.me/bdjson/directory.json"))[0];
+                    var dir = JsonConvert.DeserializeObject<System.Collections.Generic.List<SavePath>>(await wc.DownloadStringTaskAsync(RuntimeEndpoints.DirectoryJsonUrl))[0];
                     globalDirectory = dir.directoryCreate;
                     Directory.CreateDirectory(globalDirectory);
                     
                     // Initialize Logger here so it knows the global directory path
-                    SalsaLogger.Initialize(globalDirectory);
-                    SalsaLogger.Info($"Main directory created {globalDirectory}");
+                    AppLogger.Initialize(globalDirectory);
+                    AppLogger.Info($"Main directory created {globalDirectory}");
                     
-                    string cfg = Path.Combine(globalDirectory, "SalsaNOWConfig.ini");
-                    if (!System.IO.File.Exists(cfg)) await wc.DownloadFileTaskAsync(new Uri("https://salsanowfiles.work/jsons/SalsaNOWConfig.ini"), cfg);
+                    string cfg = Path.Combine(globalDirectory, RuntimeIdentity.ConfigFileName);
+                    if (!System.IO.File.Exists(cfg)) await wc.DownloadFileTaskAsync(new Uri(RuntimeEndpoints.ConfigUrl), cfg);
                 }
             }
             // Upload Crashlogs to paste.rs and show the user a link to forward to the Devs
             catch (Exception ex) 
             { 
-                SalsaLogger.UploadLogAndShowError(ex.Message);
+                AppLogger.UploadLogAndShowError(ex.Message);
                 Environment.Exit(0);
             }
         }

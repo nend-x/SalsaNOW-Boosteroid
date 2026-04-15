@@ -45,9 +45,9 @@ if ($LASTEXITCODE -ne 0) {
     throw 'MSBuild failed.'
 }
 
-$outputExe = Join-Path $repoRoot 'SalsaNOW\bin\Release\SalsaNOW.exe'
+$outputExe = Join-Path $repoRoot 'SalsaNOW\bin\Release\RuntimeApp.exe'
 if (Test-Path $outputExe) {
     Write-Host "Built EXE: $outputExe"
 } else {
-    throw 'Build finished but SalsaNOW.exe was not found in expected output folder.'
+    throw 'Build finished but RuntimeApp.exe was not found in expected output folder.'
 }

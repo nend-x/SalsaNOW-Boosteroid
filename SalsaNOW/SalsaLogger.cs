@@ -4,19 +4,19 @@ using System.Net;
 using System.Windows.Forms;
 using System.Threading;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
-    internal static class SalsaLogger
+    internal static class AppLogger
     {
         private static string _logFilePath;
 
         // Initializes the local log file in the global directory
         public static void Initialize(string globalDirectory)
         {
-            _logFilePath = Path.Combine(globalDirectory, "SalsaNOW.log");
+            _logFilePath = Path.Combine(globalDirectory, RuntimeIdentity.LogFileName);
             try
             {
-                File.WriteAllText(_logFilePath, $"--- SalsaNOW Session Log [{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ---\n");
+                File.WriteAllText(_logFilePath, RuntimeIdentity.SessionLogHeader);
             }
             catch { }
         }
@@ -52,7 +52,7 @@ namespace SalsaNOW
                 try
                 {
                     // 1. Construct the crash report payload
-                    string logContent = $"--- SalsaNOW CRASH REPORT ---\nTime: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError: {fatalErrorMessage}\n\n";
+                    string logContent = RuntimeIdentity.CrashReportHeader(fatalErrorMessage);
                     
                     if (!string.IsNullOrEmpty(_logFilePath) && File.Exists(_logFilePath))
                     {
@@ -63,7 +63,7 @@ namespace SalsaNOW
                     using (var wc = new WebClient())
                     {
                         // Adding a User-Agent is necessary to prevent the API from blocking the request as spam
-                        wc.Headers.Add("User-Agent", "SalsaNOW-CrashReporter");
+                        wc.Headers.Add("User-Agent", RuntimeIdentity.CrashReporterUserAgent);
                         wc.Headers.Add("Content-Type", "text/plain");
                         pasteUrl = wc.UploadString("https://paste.rs/", "POST", logContent).Trim();
                     }
@@ -71,8 +71,8 @@ namespace SalsaNOW
                 catch { }
 
                 // Display the fatal error and the crash log link to the user
-                string msg = $"SalsaNOW just crashed!\n\nError:\n{fatalErrorMessage}\n\nPlease send this Crashlog to the SalsaNOW Devs:\n{pasteUrl}";
-                MessageBox.Show(msg, "SalsaNOW - Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string msg = $"Application crashed.\n\nError:\n{fatalErrorMessage}\n\nCrash log link:\n{pasteUrl}";
+                MessageBox.Show(msg, RuntimeIdentity.FatalErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 
             });
             

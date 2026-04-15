@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 
-namespace SalsaNOW
+namespace RuntimeApp
 {
-    internal static class SalsaSettings
+    internal static class AppSettings
     {
         public static bool NvidiaRaytracing { get; private set; }
         public static bool SkipSeelenUiExecution { get; private set; }
@@ -12,7 +12,7 @@ namespace SalsaNOW
 
         public static void Load(string globalDirectory)
         {
-            string path = Path.Combine(globalDirectory, "SalsaNOWConfig.ini");
+            string path = Path.Combine(globalDirectory, RuntimeIdentity.ConfigFileName);
             if (!File.Exists(path)) return;
 
             var lines = File.ReadAllLines(path);
