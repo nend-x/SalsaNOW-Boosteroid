@@ -1,3 +1,4 @@
+#if WINDOWS
 using System;
 using System.Runtime.InteropServices;
 
@@ -153,3 +154,4 @@ namespace RuntimeApp
         }
     }
 }
+#endif

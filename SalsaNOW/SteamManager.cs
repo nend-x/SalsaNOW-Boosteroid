@@ -1,3 +1,4 @@
+#if WINDOWS
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -109,3 +110,4 @@ namespace RuntimeApp
         }
     }
 }
+#endif

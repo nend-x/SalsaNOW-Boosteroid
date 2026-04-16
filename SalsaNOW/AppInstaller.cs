@@ -1,3 +1,4 @@
+#if WINDOWS
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -358,3 +359,4 @@ namespace RuntimeApp
         }
     }
 }
+#endif

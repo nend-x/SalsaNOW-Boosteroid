@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
@@ -14,6 +15,7 @@ namespace RuntimeApp
         private static string currentPath = Directory.GetCurrentDirectory();
         private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static string customAppsJsonPath = null;
+        private static HttpClient httpClient;
 
         static void Main(string[] args)
         {
@@ -22,7 +24,12 @@ namespace RuntimeApp
 
         static async Task MainAsync(string[] args)
         {
-            Console.Title = RuntimeIdentity.AppName;
+            // Initialize HttpClient with TLS 1.2/1.3 support
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) => true
+            };
+            httpClient = new HttpClient(handler);
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -32,40 +39,32 @@ namespace RuntimeApp
                 }
             }
 
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true;
-
             await Startup();
             
             // Load configuration once to share settings across modules
             AppSettings.Load(globalDirectory);
 
-            // Fire and forget non-blocking background services
-            //_ = BackgroundTasks.StartShortcutsSavingAsync(globalDirectory, cts.Token);
-            //_ = BackgroundTasks.StartTerminateGFNExplorerShellAsync(cts.Token);
-            //_ = BackgroundTasks.StartEacWatcherAsync(cts.Token);
-            //_ = BackgroundTasks.StartBrickPreventionAsync(cts.Token);
+#if WINDOWS
+            // Fire and forget non-blocking background services (Windows only)
             _ = BackgroundTasks.CloseHandlesLaunchersHelper(cts.Token);
             _ = BackgroundTasks.CleanlogsLauncherHelper(cts.Token);
             _ = BackgroundTasks.ResetPoliciesAndExplorerAsync(cts.Token);
 
-
-            // Execute deployment modules
+            // Execute deployment modules (Windows only)
             await AppInstaller.AppsInstallAsync(globalDirectory, customAppsJsonPath);
-            //await AppInstaller.DesktopInstallAsync(globalDirectory);
-            //await AppInstaller.AppsInstallSilentAsync(globalDirectory);
-            
-            //await SteamManager.ShutdownServerAsync(globalDirectory);
-            
-            // Apply Nvidia optimizations if enabled
-            //if (AppSettings.NvidiaRaytracing) NvidiaManager.EnableRTX();
 
             NativeMethods.ShowWindow(NativeMethods.GetConsoleWindow(), NativeMethods.SW_HIDE);
             
-            // _ = SteamManager.SetupGameSavesAsync(globalDirectory);
-            
             string batch = Path.Combine(globalDirectory, "StartupBatch.bat");
             if (File.Exists(batch)) Process.Start(new ProcessStartInfo { FileName = batch, UseShellExecute = true });
+#else
+            Console.WriteLine("[i] Running in non-Windows mode. Windows-specific features are disabled.");
+            Console.WriteLine($"[i] Global directory: {globalDirectory}");
+            
+            // Keep running for demo purposes
+            Console.WriteLine("[i] Press any key to exit...");
+            Console.ReadKey();
+#endif
 
             try { await Task.Delay(Timeout.Infinite, cts.Token); } catch (TaskCanceledException) { }
         }
@@ -74,27 +73,47 @@ namespace RuntimeApp
         {
             try
             {
-                if (!File.Exists(@"C:\Users\user\boosteroid-experience\LaunchersHelper.exe")) 
+#if WINDOWS
+                // Check for Boosteroid environment (Windows only)
+                string launcherPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
+                    "boosteroid-experience", 
+                    "LaunchersHelper.exe");
+                
+                if (!File.Exists(launcherPath)) 
                 { 
                     Console.WriteLine("[!] Not a Boosteroid environment. Exiting..."); 
-                    await Task.Delay(5000); Environment.Exit(0); 
+                    await Task.Delay(5000); 
+                    Environment.Exit(0); 
+                }
+#else
+                Console.WriteLine("[i] Skipping Boosteroid environment check (non-Windows platform).");
+#endif
+                
+                // Fetch directory configuration
+                var response = await httpClient.GetStringAsync(RuntimeEndpoints.DirectoryJsonUrl);
+                var dirs = JsonConvert.DeserializeObject<System.Collections.Generic.List<SavePath>>(response);
+                
+                if (dirs == null || dirs.Count == 0)
+                {
+                    throw new InvalidOperationException("Could not retrieve directory configuration.");
                 }
                 
-                using (var wc = new WebClient())
+                globalDirectory = dirs[0].directoryCreate;
+                Directory.CreateDirectory(globalDirectory);
+                
+                // Initialize Logger here so it knows the global directory path
+                AppLogger.Initialize(globalDirectory);
+                AppLogger.Info($"Main directory created {globalDirectory}");
+                
+                // Download config if it doesn't exist
+                string cfg = Path.Combine(globalDirectory, RuntimeIdentity.ConfigFileName);
+                if (!File.Exists(cfg)) 
                 {
-                    var dir = JsonConvert.DeserializeObject<System.Collections.Generic.List<SavePath>>(await wc.DownloadStringTaskAsync(RuntimeEndpoints.DirectoryJsonUrl))[0];
-                    globalDirectory = dir.directoryCreate;
-                    Directory.CreateDirectory(globalDirectory);
-                    
-                    // Initialize Logger here so it knows the global directory path
-                    AppLogger.Initialize(globalDirectory);
-                    AppLogger.Info($"Main directory created {globalDirectory}");
-                    
-                    string cfg = Path.Combine(globalDirectory, RuntimeIdentity.ConfigFileName);
-                    if (!System.IO.File.Exists(cfg)) await wc.DownloadFileTaskAsync(new Uri(RuntimeEndpoints.ConfigUrl), cfg);
+                    var configData = await httpClient.GetByteArrayAsync(RuntimeEndpoints.ConfigUrl);
+                    await File.WriteAllBytesAsync(cfg, configData);
                 }
             }
-            // Upload Crashlogs to paste.rs and show the user a link to forward to the Devs
             catch (Exception ex) 
             { 
                 AppLogger.UploadLogAndShowError(ex.Message);
